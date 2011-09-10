@@ -134,7 +134,7 @@ class ServerConnection:
 		elif aCommand in self.itsCommands:
 			if self.GetUserRole( self.itsSource ) >= self.itsCommands[ aCommand ]:
 				try:
-					self.itsModules[ aCommand ].HandleMessage( self.itsMessage, self.itsSource, self.itsTarget, self.itsSendQueue )
+					self.itsModules[ aCommand ].HandleMessage( self )
 				except:
 					traceback.print_exc(file=sys.stdout)
 		elif self.GetUserRole( self.itsSource ) >= 100:
@@ -163,6 +163,11 @@ class ServerConnection:
 		if theChannel not in self.itsChannels:			
 			self.itsSocket.send( "JOIN %s\r\n" % theChannel )
 			self.itsChannels.append( theChannel )
+
+	def DisconnectFromChannel( self, theChannel ):
+		if theChannel in self.itsChannels:			
+			self.itsSocket.send( "PART %s\r\n" % theChannel )
+			self.itsChannels.remove( theChannel )
 		
 	def SendText( self, theText, theTarget ):
 		aMessage = "PRIVMSG %s :%s\r\n" % ( theTarget, theText )

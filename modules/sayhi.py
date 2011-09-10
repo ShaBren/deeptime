@@ -1,5 +1,5 @@
-def HandleMessage( theMessage, theSource, theTarget, theSendQueue ):
-	theSendQueue.append( "PRIVMSG %s :%s\r\n" % ( theTarget, "Hi!" ) )
+def HandleMessage( theServerConnection ):
+	theServerConnection.SendText( "Hi!", theServerConnection.itsTarget )
 
 def Help():
 	return "Simple test module to say 'Hi!'"
