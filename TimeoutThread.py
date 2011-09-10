@@ -5,10 +5,10 @@ class TimeoutThread( threading.Thread ):
 	itsTimeout = 5
 
 	def start( self ):
+		self.itsStartTime = time.time()
 		self.__run_backup = self.run
 		self.run = self.__run_with_trace
 		threading.Thread.start( self )
-		self.itsStartTime = time.time()
 
 	def __run_with_trace( self ):
 		sys.settrace( self.globaltrace )

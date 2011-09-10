@@ -29,20 +29,44 @@ class ServerConnection:
 		self.itsPort = aRow[2]
 		self.itsUsername = aRow[3]
 		
-		self.itsSocket = socket.socket()
-		self.itsSocket.connect( ( self.itsHostname, self.itsPort ) )
+		self.itsDebugFile = open( "%s.debug" % self.itsHostname, "a" )
+
+		self.Connect()
+
+	def Connect( self ):
+		self.isConnected = False
+
+		try:
+			self.itsSocket = socket.socket()
+			self.itsSocket.connect( ( self.itsHostname, self.itsPort ) )
 		
-		self.itsSocket.send( "NICK %s\r\n" % self.itsUsername )
-		self.itsSocket.send( "USER %s %s PB :%s\r\n" % ( self.itsUsername, self.itsHostname, self.itsHostname ) )
+			self.itsSocket.send( "NICK %s\r\n" % self.itsUsername )
+			self.itsSocket.send( "USER %s %s PB :%s\r\n" % ( self.itsUsername, self.itsHostname, self.itsHostname ) )
+		except:
+			self.isConnected = False
+			print "Connect to %s on port %s failed.\n" % ( self.itsHostname, self.itsPort )
+			return
 		
 		self.LoadCommands()
 		
 		self.isConnected = True
-		
+
+		try:
+			if self.itsSendThread.is_alive():
+				self.itsSendThread.join( 1 )
+		except:
+			pass
+
+		try:
+			if self.itsSendThread.is_alive():
+				return
+		except:
+			pass
+			
 		self.itsSendThread = threading.Thread( target=self.ProcessSendQueue )
 		self.itsSendThread.daemon = True
 		self.itsSendThread.start()
-		
+	
 	def LoadCommands( self ):
 		self.itsCommands = {}
 		self.itsDBCursor.execute( "SELECT command, required_role FROM command WHERE network=?", self.itsNetworkID )
@@ -91,6 +115,13 @@ class ServerConnection:
 		while self.isConnected:
 			aBuffer = self.itsSocket.recv( 4096 )
 			
+			if len( aBuffer ) == 0:
+				print "Connection to %s lost. Attempting to reconnect...\n" % self.itsHostname
+				self.Connect()
+
+			self.itsDebugFile.write( aBuffer )
+			self.itsDebugFile.flush()
+
 			aBuffer = aBuffer.rstrip()
 			aLine = aBuffer.split()
 	
@@ -118,6 +149,18 @@ class ServerConnection:
 						self.itsMessage = self.itsMessage.lstrip( self.itsCommandPrefix )
 						self.itsMessageParts = self.itsMessage.split()
 						self.ParseCommand()
+				elif aLine[1] == 'QUIT':
+ 					aSource = aLine[0].split('!')[0].lstrip(':')
+
+					if aSource in self.itsUsers:
+						self.itsUsers.remove( aSource )
+				elif aLine[1] == 'NICK':
+ 					aSource = aLine[0].split('!')[0].lstrip(':')
+					aNewNick = aLine[2].lstrip(':')
+
+					if aSource in self.itsUsers:
+						self.itsUsers[ aNewNick ] = self.itsUsers[ aSource ]
+						self.itsUsers.remove( aSource )
 
 	def GetUserRole( self, theUsername ):
 		if theUsername in self.itsUsers:
@@ -138,9 +181,9 @@ class ServerConnection:
 			if self.GetUserRole( self.itsSource ) >= self.itsCommands[ aCommand ]:
 				self.DoCommand( aCommand )
 		elif self.GetUserRole( self.itsSource ) >= 100:
-			if aCommand == "update" or aCommand = "reload":
+			if aCommand == "update" or aCommand == "reload":
 				self.LoadCommands()
-			elif aCommand == "quit" or aCommand = "exit":
+			elif aCommand == "quit" or aCommand == "exit":
 				self.Disconnect()
 
 	def DoCommand( self, theCommand ):
