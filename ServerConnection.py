@@ -2,6 +2,7 @@ import socket, string, threading, time, sqlite3, imp, traceback, sys
 
 from os.path import isfile
 from collections import deque
+from TimeoutThread import TimeoutThread
 
 class ServerConnection:
 
@@ -113,7 +114,7 @@ class ServerConnection:
 					
 					self.LogMessage()
 						
-					if aMessage[0] == self.itsCommandPrefix:
+					if aMessage[0] == self.itsCommandPrefix or self.itsTarget == self.itsSource:
 						self.itsMessage = self.itsMessage.lstrip( self.itsCommandPrefix )
 						self.itsMessageParts = self.itsMessage.split()
 						self.ParseCommand()
@@ -129,20 +130,40 @@ class ServerConnection:
 		
 		if aCommand == "help":
 			self.DoHelp()
+		elif aCommand == "usage":
+			self.DoUsage()
 		elif aCommand == "auth":
 			self.AuthenticateUser()
 		elif aCommand in self.itsCommands:
 			if self.GetUserRole( self.itsSource ) >= self.itsCommands[ aCommand ]:
-				try:
-					self.itsModules[ aCommand ].HandleMessage( self )
-				except:
-					traceback.print_exc(file=sys.stdout)
+				self.DoCommand( aCommand )
 		elif self.GetUserRole( self.itsSource ) >= 100:
-			if aCommand == "update":
+			if aCommand == "update" or aCommand = "reload":
 				self.LoadCommands()
-			elif aCommand == "quit":
+			elif aCommand == "quit" or aCommand = "exit":
 				self.Disconnect()
 
+	def DoCommand( self, theCommand ):
+		try:
+			aThread = TimeoutThread( target=self.itsModules[ theCommand ].HandleMessage, args=( self, self.itsMessage, self.itsSource, self.itsTarget ) )
+			aThread.daemon = True
+			aThread.start()
+		except:
+			traceback.print_exc(file=sys.stdout)
+
+	def DoUsage( self ):
+		if len( self.itsMessageParts ) > 1:
+			if self.itsMessageParts[1] in self.itsCommands:
+				try:
+					self.SendText( self.itsModules[ self.itsMessageParts[1] ].Usage(), self.itsTarget )
+				except:
+					traceback.print_exc(file=sys.stdout)
+			else:
+				self.SendText( "Unknown command. Try %shelp to view available commands." % self.itsCommandPrefix, self.itsTarget )
+		else:
+			self.SendText( "Available commands: %s" % ",".join( self.itsCommands ), self.itsTarget )
+			self.SendText( "Try help <command> or usage <command>", self.itsTarget )
+	
 	def DoHelp( self ):
 		if len( self.itsMessageParts ) > 1:
 			if self.itsMessageParts[1] in self.itsCommands:
@@ -151,16 +172,17 @@ class ServerConnection:
 				except:
 					traceback.print_exc(file=sys.stdout)
 			else:
-				self.SendText( "Unknown command. Try %shelp to view all available commands." % self.itsCommandPrefix, self.itsTarget )
+				self.SendText( "Unknown command. Try %shelp to view available commands." % self.itsCommandPrefix, self.itsTarget )
 		else:
 			self.SendText( "Available commands: %s" % ",".join( self.itsCommands ), self.itsTarget )
+			self.SendText( "Try help <command> or usage <command>", self.itsTarget )
 		
 	def LogMessage( self ):
 		self.itsDBCursor.execute( 'INSERT INTO `log` VALUES (?,?,?,?,?)', ( self.itsNetworkID, self.itsSource, self.itsTarget, str( time.time() ), self.itsMessage ) )
 		self.itsDB.commit()
 		
 	def ConnectToChannel( self, theChannel ):
-		if theChannel not in self.itsChannels:			
+		if theChannel not in self.itsChannels:
 			self.itsSocket.send( "JOIN %s\r\n" % theChannel )
 			self.itsChannels.append( theChannel )
 

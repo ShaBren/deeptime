@@ -4,13 +4,13 @@ def HandleMessage( theConnection, theMessage, theSource, theTarget ):
 	if len( messageParts ) < 2:
 		theConnection.SendText( self.Usage(), theTarget )
 	elif len( messageParts ) == 2:
-		theConnection.ConnectToChannel( messageParts[1] )
+		theConnection.DisconnectFromChannel( messageParts[1] )
 	else:
 		for channel in messageParts[1:]:
-			theConnection.ConnectToChannel( channel )
+			theConnection.DisconnectFromChannel( channel )
 
 def Help():
-	return "Joins a channel"
+	return "Leaves a channel"
 
 def Usage():
-	return "Usage: join <channel> [channel [...]]"
+	return "Usage: part <channel> [channel [...]]"
