@@ -9,12 +9,14 @@ class ServerConnection:
 	itsChannels = []
 	itsUsers = {}
 	itsModules = {}
+	itsHandlers = {}
 	itsSendQueue = deque()
 	itsCommandPrefix = "+"
 	isConnected = False
 	
-	def __init__( self, theNetworkID ):
+	def __init__( self, theNetworkID, theDebugFlag ):
 		self.itsNetworkID = str( theNetworkID )
+		self.itsDebugFlag = theDebugFlag
 		
 		self.itsDB = sqlite3.connect( "config.db" )
 		self.itsDBCursor = self.itsDB.cursor()
@@ -29,7 +31,8 @@ class ServerConnection:
 		self.itsPort = aRow[2]
 		self.itsUsername = aRow[3]
 		
-		self.itsDebugFile = open( "%s.debug" % self.itsHostname, "a" )
+		if self.itsDebugFlag:
+			self.itsDebugFile = open( "%s.debug" % self.itsHostname, "a" )
 
 		self.Connect()
 
@@ -67,27 +70,45 @@ class ServerConnection:
 		self.itsSendThread.daemon = True
 		self.itsSendThread.start()
 	
-	def LoadCommands( self ):
+	def LoadCommands( self, theForceFlag ):
 		self.itsCommands = {}
 		self.itsDBCursor.execute( "SELECT command, required_role FROM command WHERE network=?", self.itsNetworkID )
 		
 		aFailedImport = []
 		
+		if theForceFlag:
+			self.itsModules = {}
+			self.itsHandlers = {}
+
 		for aRow in self.itsDBCursor:
 			aCommand = aRow[0]
 			
-			try:
-				self.itsModules[ aCommand ] = imp.load_source( aCommand, "modules/%s.py" % aCommand )
-				self.itsCommands[ aRow[0] ] = aRow[1]
-			except:
-				traceback.print_exc(file=sys.stdout)
-				aFailedImport.append( aCommand )
+			if aCommand not in self.itsModules:
+				try:
+					self.itsModules[ aCommand ] = imp.load_source( aCommand, "modules/%s.py" % aCommand )
+					self.itsModuleClasses[ aCommand ] = self.itsModules[ aCommand ].IRCModule( this )
+					self.itsCommands[ aRow[0] ] = aRow[1]
+
+					try:
+						self.itsModules[ aCommand ].Init()
+					except:
+						traceback.print_exc( file=sys.stdout )
+				except:
+					traceback.print_exc( file=sys.stdout )
+					aFailedImport.append( aCommand )
+					del self.itsModules[ aCommand ]
 		
 		if self.isConnected:
 			if len( aFailedImport ) == 0:
 				self.SendText( "Commands reloaded.", self.itsTarget )
 			else:
 				self.SendText( "Failed to reload: %s" % ",".join( aFailedImport ), self.itsTarget )
+
+	def RegisterHandler( self, theHandlerType, theHandler ):
+		if not self.itsHandlers.has_key( theHandlerType ):
+			self.itsHandlers[ theHandlerType ] = []
+
+		self.itsHandlers[ theHandlerType ].append( theHandler )
 	
 	def AuthenticateUser( self ):
 		if self.itsSource != self.itsTarget:
@@ -119,8 +140,9 @@ class ServerConnection:
 				print "Connection to %s lost. Attempting to reconnect...\n" % self.itsHostname
 				self.Connect()
 
-			self.itsDebugFile.write( aBuffer )
-			self.itsDebugFile.flush()
+			if self.itsDebugFlag:
+				self.itsDebugFile.write( aBuffer )
+				self.itsDebugFile.flush()
 
 			aBuffer = aBuffer.rstrip()
 			aLine = aBuffer.split()
@@ -181,8 +203,10 @@ class ServerConnection:
 			if self.GetUserRole( self.itsSource ) >= self.itsCommands[ aCommand ]:
 				self.DoCommand( aCommand )
 		elif self.GetUserRole( self.itsSource ) >= 100:
-			if aCommand == "update" or aCommand == "reload":
-				self.LoadCommands()
+			if aCommand == "reload":
+				self.LoadCommands( True )
+			elif aCommand == "update":
+				self.LoadCommands( False )
 			elif aCommand == "quit" or aCommand == "exit":
 				self.Disconnect()
 
