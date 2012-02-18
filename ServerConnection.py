@@ -144,11 +144,9 @@ class ServerConnection:
 					self.itsMessage = aMessage
 					
 					self.LogMessage()
-						
-					if aMessage[0] == self.itsCommandPrefix or self.itsTarget == self.itsSource:
-						self.itsMessage = self.itsMessage.lstrip( self.itsCommandPrefix )
-						self.itsMessageParts = self.itsMessage.split()
-						self.ParseCommand()
+
+					self.CheckCommand()
+
 				elif aLine[1] == 'QUIT':
  					aSource = aLine[0].split('!')[0].lstrip(':')
 
@@ -161,6 +159,21 @@ class ServerConnection:
 					if aSource in self.itsUsers:
 						self.itsUsers[ aNewNick ] = self.itsUsers[ aSource ]
 						self.itsUsers.remove( aSource )
+
+
+		
+	def CheckCommand( self ):
+		if ( self.itsMessage.startswith( self.itsCommandPrefix ) 
+			or self.itsTarget == self.itsSource 
+			):
+				self.itsMessage = self.itsMessage.lstrip( self.itsCommandPrefix )
+				self.itsMessageParts = self.itsMessage.split()
+				self.ParseCommand()
+		elif self.itsMessage.startswith( self.itsUsername ):
+			self.itsMessage = self.itsMessage[ self.itsMessage.find( " " ) : ]
+			self.itsMessageParts = self.itsMessage.split()
+			self.ParseCommand()
+			
 
 	def GetUserRole( self, theUsername ):
 		if theUsername in self.itsUsers:
@@ -221,8 +234,11 @@ class ServerConnection:
 			self.SendText( "Try help <command> or usage <command>", self.itsTarget )
 		
 	def LogMessage( self ):
-		self.itsDBCursor.execute( 'INSERT INTO `log` VALUES (?,?,?,?,?)', ( self.itsNetworkID, self.itsSource, self.itsTarget, str( time.time() ), self.itsMessage ) )
-		self.itsDB.commit()
+		try:
+			self.itsDBCursor.execute( 'INSERT INTO `log` VALUES (?,?,?,?,?)', ( self.itsNetworkID, self.itsSource, self.itsTarget, str( time.time() ), self.itsMessage ) )
+			self.itsDB.commit()
+		except:
+			pass
 		
 	def ConnectToChannel( self, theChannel ):
 		if theChannel not in self.itsChannels:
