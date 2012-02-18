@@ -14,3 +14,6 @@ def Help():
 
 def Usage():
 	return "Usage: part <channel> [channel [...]]"
+
+def Init():
+	return
