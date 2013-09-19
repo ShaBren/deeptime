@@ -13,6 +13,7 @@ class ServerConnection:
 	itsSendQueue = deque()
 	itsCommandPrefix = "+"
 	isConnected = False
+	itsModuleClasses = {}
 	
 	def __init__( self, theNetworkID, theDebugFlag ):
 		self.itsNetworkID = str( theNetworkID )
@@ -50,7 +51,7 @@ class ServerConnection:
 			print "Connect to %s on port %s failed.\n" % ( self.itsHostname, self.itsPort )
 			return
 		
-		self.LoadCommands()
+		self.LoadCommands( False )
 		
 		self.isConnected = True
 
@@ -86,13 +87,13 @@ class ServerConnection:
 			if aCommand not in self.itsModules:
 				try:
 					self.itsModules[ aCommand ] = imp.load_source( aCommand, "modules/%s.py" % aCommand )
-					self.itsModuleClasses[ aCommand ] = self.itsModules[ aCommand ].IRCModule( this )
+					#self.itsModuleClasses[ aCommand ] = self.itsModules[ aCommand ].IRCModule( self )
 					self.itsCommands[ aRow[0] ] = aRow[1]
 
-					try:
-						self.itsModules[ aCommand ].Init()
-					except:
-						traceback.print_exc( file=sys.stdout )
+					#try:
+						#self.itsModules[ aCommand ].Init()
+					#except:
+						#traceback.print_exc( file=sys.stdout )
 				except:
 					traceback.print_exc( file=sys.stdout )
 					aFailedImport.append( aCommand )
@@ -241,8 +242,8 @@ class ServerConnection:
 			else:
 				self.SendText( "Unknown command. Try %shelp to view available commands." % self.itsCommandPrefix, self.itsTarget )
 		else:
-			self.SendText( "Available commands: %s" % ",".join( self.itsCommands ), self.itsTarget )
-			self.SendText( "Try help <command> or usage <command>", self.itsTarget )
+			self.SendText( "Available commands: %s" % ", ".join( self.itsCommands ), self.itsTarget )
+			self.SendText( "Try %shelp <command> or %susage <command>" % ( self.itsCommandPrefix, self.itsCommandPrefix ), self.itsTarget )
 	
 	def DoHelp( self ):
 		if len( self.itsMessageParts ) > 1:
@@ -254,8 +255,8 @@ class ServerConnection:
 			else:
 				self.SendText( "Unknown command. Try %shelp to view available commands." % self.itsCommandPrefix, self.itsTarget )
 		else:
-			self.SendText( "Available commands: %s" % ",".join( self.itsCommands ), self.itsTarget )
-			self.SendText( "Try help <command> or usage <command>", self.itsTarget )
+			self.SendText( "Available commands: %s" % ", ".join( self.itsCommands ), self.itsTarget )
+			self.SendText( "Try %shelp <command> or %susage <command>" % ( self.itsCommandPrefix, self.itsCommandPrefix ), self.itsTarget )
 		
 	def LogMessage( self ):
 		try:

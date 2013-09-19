@@ -4,11 +4,5 @@ def Help():
 def Usage():
 	return "Usage: sayhi"
 
-class IRCModule:
-	
-	def __init__( self, theServerConnection ):
-		self.itsServerConnection = theServerConnection
-		self.itsServerConnection.RegisterHandler( "PRIVMSG", this.HandleMessage ) )
-
-	def HandleMessage( self, theMessageText, theSource, theTarget ):
-		self.itsServerConnection.SendText( theTarget, "Hi!" )
+def HandleMessage( theConnection, theMessageText, theSource, theTarget ):
+	theConnection.SendText( "Hi!", theTarget )
