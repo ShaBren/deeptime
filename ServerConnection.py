@@ -147,6 +147,9 @@ class ServerConnection:
 
 			aBuffer = aBuffer.rstrip()
 			aLine = aBuffer.split()
+
+			if len( aLine ) < 1:
+				continue
 	
 			if aLine[0] == "PING":
 				self.SendRaw( "PONG " + aLine[1] )
