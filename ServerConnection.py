@@ -19,7 +19,7 @@ class ServerConnection:
 		self.itsNetworkID = str( theNetworkID )
 		self.itsDebugFlag = theDebugFlag
 		
-		self.itsDB = sqlite3.connect( "config.db" )
+		self.itsDB = sqlite3.connect( "config.db", check_same_thread=False )
 		self.itsDBCursor = self.itsDB.cursor()
 		
 		self.itsDBCursor.execute( "SELECT * FROM network WHERE network_id=?", self.itsNetworkID )
